@@ -30,6 +30,9 @@ const exerciseSchema = new Schema({
   date: {
     type: Date,
     default: Date.now,
+    get: function (date) {
+      return date.toDateString();
+    },
   },
 });
 
@@ -126,7 +129,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
       username: user.username,
       description: exercise.description,
       duration: exercise.duration,
-      date: exercise.date.toDateString(),
+      date: exercise.date,
     });
   } catch (error) {
     return res.json({
