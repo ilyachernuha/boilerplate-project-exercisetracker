@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+const e = require("express");
 
 require("dotenv").config();
 
@@ -11,19 +12,6 @@ const connection = mongoose.connection;
 
 const Schema = mongoose.Schema;
 const ObjectId = Schema.ObjectId;
-
-const userSchema = new Schema({
-  username: {
-    type: String,
-    required: true,
-  },
-  exercises: [
-    {
-      type: ObjectId,
-      ref: "Exercise",
-    },
-  ],
-});
 
 const exerciseSchema = new Schema({
   userId: {
@@ -45,6 +33,19 @@ const exerciseSchema = new Schema({
   },
 });
 
+const userSchema = new Schema({
+  username: {
+    type: String,
+    required: true,
+  },
+  exercises: [
+    {
+      type: ObjectId,
+      ref: "Exercise",
+    },
+  ],
+});
+
 const User = mongoose.model("User", userSchema);
 const Exercise = mongoose.model("Exercise", exerciseSchema);
 
@@ -60,14 +61,18 @@ app.get("/", (req, res) => {
 });
 
 app.post("/api/users", async (req, res) => {
+  const { username } = req.body;
+  if (!username) {
+    return res.json({ error: "username is required" });
+  }
+  const user = new User({
+    username: username,
+  });
   try {
-    const newUser = new User({
-      username: req.body.username,
-    });
-    await newUser.save();
+    await user.save();
     return res.json({
-      _id: newUser._id,
-      username: newUser.username,
+      _id: user._id,
+      username: user.username,
     });
   } catch (error) {
     return res.json({
@@ -88,28 +93,40 @@ app.get("/api/users", async (req, res) => {
 });
 
 app.post("/api/users/:_id/exercises", async (req, res) => {
+  const _id = req.params._id;
+  const { description, duration, date } = req.body;
+  const parsedDate = new Date(date);
+  if (description === "" || duration === "") {
+    return res.json({ error: "description and duration are required" });
+  }
+  if (!/^[0-9]*$/.test(duration)) {
+    return res.json({ error: "invalid duration" });
+  }
+  if (date !== "" && parsedDate == "Invalid Date") {
+    return res.json({ error: "invalid date" });
+  }
   try {
-    let user = await User.findById(req.params._id);
+    let user = await User.findById(_id);
     if (!user) {
-      return res.json({error: "User not found"});
+      return res.json({ error: "User not found" });
     }
     let exercise = new Exercise({
       userId: user._id,
-      description: req.body.description,
-      duration: req.body.duration
+      description: description,
+      duration: duration,
     });
-    const date = Date.parse(req.body.date);
-    if (!date) {
-      exercise.date = new Date(date);
+    if (date) {
+      exercise.date = date;
     }
     user.exercises.push(exercise._id);
+    await exercise.save();
     await user.save();
     return res.json({
       _id: user._id,
       username: user.username,
       description: exercise.description,
       duration: exercise.duration,
-      date: new Date(exercise.date).toDateString()
+      date: exercise.date.toDateString(),
     });
   } catch (error) {
     return res.json({
@@ -119,16 +136,25 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
 });
 
 app.get("/api/users/:_id/logs", async (req, res) => {
+  const _id = req.params._id;
+  const { from, to, limit } = req.query;
   try {
-    const user = await User.findById(req.params._id);
+    const user = await User.findById(_id, {
+      _id: 1,
+      username: 1,
+    });
     if (!user) {
       return res.json({ error: "User not found" });
     }
+    const exercises = await Exercise.find(
+      { userId: _id },
+      { description: 1, duration: 1, date: 1 }
+    ).exec();
     return res.json({
       _id: user._id,
       username: user.username,
-      count: user.exercises.length,
-      log: user.exercises,
+      count: exercises.length,
+      log: exercises,
     });
   } catch (error) {
     return res.json({
