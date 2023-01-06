@@ -55,10 +55,21 @@ router.get("/:_id/logs", async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    const exercises = await Exercise.find(
-      { userId: user._id },
-      { description: 1, duration: 1, date: 1 }
-    );
+    const exercisesQuery = { userId: user._id };
+    if (req.query.from || req.query.to) {
+      exercisesQuery.date = {};
+      if (req.query.from) {
+        exercisesQuery.date.$gte = req.query.from;
+      }
+      if (req.query.to) {
+        exercisesQuery.date.$lte = req.query.to;
+      }
+    }
+    const exercises = await Exercise.find(exercisesQuery, {
+      description: 1,
+      duration: 1,
+      date: 1,
+    }).limit(req.query.limit);
     return res.json({
       _id: user._id,
       count: exercises.length,
