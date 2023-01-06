@@ -1,8 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const e = require("express");
 
 require("dotenv").config();
 
@@ -12,7 +10,7 @@ mongoose
   .catch((error) => console.error(error));
 
 const db = mongoose.connection;
-db.on("error", error => console.error(error));
+db.on("error", (error) => console.error(error));
 db.once("open", () => console.log("Connected to MongoDB"));
 
 const Schema = mongoose.Schema;
@@ -59,10 +57,10 @@ const Exercise = mongoose.model("Exercise", exerciseSchema);
 
 const app = express();
 
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static("public"));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/views/index.html");
@@ -78,14 +76,12 @@ app.post("/api/users", async (req, res) => {
   });
   try {
     await user.save();
-    return res.json({
+    return res.status(201).json({
       _id: user._id,
       username: user.username,
     });
   } catch (error) {
-    return res.json({
-      error: error.message,
-    });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -94,9 +90,7 @@ app.get("/api/users", async (req, res) => {
     const users = await User.find({}, { _id: 1, username: 1 });
     return res.json(users);
   } catch (error) {
-    return res.json({
-      error: error.message,
-    });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -116,7 +110,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
   try {
     let user = await User.findById(_id);
     if (!user) {
-      return res.json({ error: "User not found" });
+      return res.status(404).json({ error: "User not found" });
     }
     let exercise = new Exercise({
       userId: user._id,
@@ -129,7 +123,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
     user.exercises.push(exercise._id);
     await exercise.save();
     await user.save();
-    return res.json({
+    return res.status(201).json({
       _id: user._id,
       username: user.username,
       description: exercise.description,
@@ -137,9 +131,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
       date: exercise.date,
     });
   } catch (error) {
-    return res.json({
-      error: error.message,
-    });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -152,7 +144,7 @@ app.get("/api/users/:_id/logs", async (req, res) => {
       username: 1,
     });
     if (!user) {
-      return res.json({ error: "User not found" });
+      return res.status(404).json({ error: "User not found" });
     }
     const exercises = await Exercise.find(
       { userId: _id },
@@ -165,9 +157,7 @@ app.get("/api/users/:_id/logs", async (req, res) => {
       log: exercises,
     });
   } catch (error) {
-    return res.json({
-      error: error.message,
-    });
+    return res.status(500).json({ error: error.message });
   }
 });
 
